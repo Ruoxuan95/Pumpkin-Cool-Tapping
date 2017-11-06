@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.io.wavfile import read
 import visualize
+import keyboard
 
 
 def read_wav(file_path, chunk_size=1000):
@@ -12,7 +13,10 @@ def read_wav(file_path, chunk_size=1000):
 
 
 if __name__ == "__main__":
+    all_pin = [5, 6, 13, 19]
+
     visualizer = visualize.Visualizer()
+    keyboard.key_initiate(all_pin)
 
     try:
         for chunk in read_wav("sample.wav"):
@@ -22,8 +26,12 @@ if __name__ == "__main__":
 
             frame = [0]*4
             frame[int(max_freq / 25) > 3 and 3 or int(max_freq / 25)] = 1
-            visualizer.refresh(frame)
+
+            visualizer.refresh(frame, keyboard.key_status(all_pin))
             visualizer.tick()
 
     except KeyboardInterrupt:
         pass
+
+    finally:
+        keyboard.key_clean()

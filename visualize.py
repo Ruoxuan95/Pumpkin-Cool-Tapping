@@ -60,9 +60,10 @@ class Note(object):
         self.verify = Trapezoid(screen, height - verify_height, height, index,
                                 self.left_slope, self.right_slope, self.color)
 
-    def move_all_trapezoids(self):
+    def move_all_trapezoids(self, pressed):
+        if pressed and self.trapezoids[0].bottom <= height - verify_height:
+            self.verify.render()
         self.trapezoids = [trapezoid.render() for trapezoid in self.trapezoids if trapezoid.move_down()]
-        self.verify.render()
 
 
 class Visualizer(object):
@@ -73,7 +74,7 @@ class Visualizer(object):
                       Note(self.screen, 2, display.GREEN),
                       Note(self.screen, 3, display.BLUE)]
 
-    def refresh(self, frame):
+    def refresh(self, frame, pressed):
         self.screen.clear()
         for pos in self.screen.get_click_pos():
             print pos
@@ -88,7 +89,7 @@ class Visualizer(object):
                                                               self.notes[i].left_slope,
                                                               self.notes[i].right_slope,
                                                               self.notes[i].color))
-            self.notes[i].move_all_trapezoids()
+            self.notes[i].move_all_trapezoids(pressed[i])
 
         self.screen.display()
 
@@ -105,7 +106,7 @@ if __name__ == "__main__":
                 visualizer.refresh([ord(byte) >> 3 & 0x1,
                                     ord(byte) >> 2 & 0x1,
                                     ord(byte) >> 1 & 0x1,
-                                    ord(byte) >> 0 & 0x1])
+                                    ord(byte) >> 0 & 0x1], [1]*4)
                 visualizer.tick()
 
     except KeyboardInterrupt:
