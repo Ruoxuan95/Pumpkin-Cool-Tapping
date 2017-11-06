@@ -1,6 +1,7 @@
 import display
 
 width, height = 320, 240
+verify_height = 40
 speed = 4
 trapezoid_top_width = 10
 top_anchor = range(width / 2 - trapezoid_top_width * 2,
@@ -36,18 +37,18 @@ class Trapezoid(object):
                   and (self.bottom / self.left_slope + top_anchor[self.index], )
                   or (top_anchor[self.index], ))[0], self.bottom]]
 
+    def render(self):
+        self.screen.render_polygon(self.get_points(), self.color)
+        return self
+
     def move_down(self):
         self.top = min(height, self.top + speed)
         self.bottom = min(height, self.bottom + speed)
-        if self.top < height:
-            self.screen.render_polygon(self.get_points(), self.color)
-            return True
-        else:
-            return False
+        return self.top < height - verify_height
 
 
 class Note(object):
-    def __init__(self, index, color):
+    def __init__(self, screen, index, color):
         self.color = color
         self.left_slope = (top_anchor[index] != bottom_anchor[index]
                            and (height / float(bottom_anchor[index] - top_anchor[index]), )
@@ -56,23 +57,27 @@ class Note(object):
                             and (height / float(bottom_anchor[index+1] - top_anchor[index+1]),)
                             or (0, ))[0]
         self.trapezoids = []
+        self.verify = Trapezoid(screen, height - verify_height, height, index,
+                                self.left_slope, self.right_slope, self.color)
 
     def move_all_trapezoids(self):
-        self.trapezoids = [trapezoid for trapezoid in self.trapezoids if trapezoid.move_down()]
+        self.trapezoids = [trapezoid.render() for trapezoid in self.trapezoids if trapezoid.move_down()]
+        self.verify.render()
 
 
 class Visualizer(object):
     def __init__(self):
         self.screen = display.Screen(width, height, False)
-        self.notes = [Note(0, display.WHITE),
-                      Note(1, display.RED),
-                      Note(2, display.GREEN),
-                      Note(3, display.BLUE)]
+        self.notes = [Note(self.screen, 0, display.WHITE),
+                      Note(self.screen, 1, display.RED),
+                      Note(self.screen, 2, display.GREEN),
+                      Note(self.screen, 3, display.BLUE)]
 
     def refresh(self, frame):
         self.screen.clear()
         for pos in self.screen.get_click_pos():
             print pos
+            exit(0)
 
         for i in range(4):
             if frame[i]:
@@ -88,7 +93,7 @@ class Visualizer(object):
         self.screen.display()
 
     def tick(self):
-        self.screen.tick(30)
+        self.screen.tick(60)
 
 
 if __name__ == "__main__":
