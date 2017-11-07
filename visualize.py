@@ -37,8 +37,8 @@ class Trapezoid(object):
                   and (self.bottom / self.left_slope + top_anchor[self.index], )
                   or (top_anchor[self.index], ))[0], self.bottom]]
 
-    def render(self):
-        self.screen.render_polygon(self.get_points(), self.color)
+    def render(self, color=None):
+        self.screen.render_polygon(self.get_points(), color and color or self.color)
         return self
 
     def move_down(self):
@@ -61,14 +61,14 @@ class Note(object):
                                 self.left_slope, self.right_slope, self.color)
 
     def move_all_trapezoids(self, pressed):
-        if pressed and self.trapezoids[0].bottom <= height - verify_height:
-            self.verify.render()
+        self.verify.render(pressed and self.trapezoids and self.trapezoids[0].bottom >= height - verify_height
+                           and self.color or display.PINK)
         self.trapezoids = [trapezoid.render() for trapezoid in self.trapezoids if trapezoid.move_down()]
 
 
 class Visualizer(object):
-    def __init__(self):
-        self.screen = display.Screen(width, height, False)
+    def __init__(self, on_tft=False):
+        self.screen = display.Screen(width, height, on_tft)
         self.notes = [Note(self.screen, 0, display.WHITE),
                       Note(self.screen, 1, display.RED),
                       Note(self.screen, 2, display.GREEN),

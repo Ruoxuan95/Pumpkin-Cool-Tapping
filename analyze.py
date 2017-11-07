@@ -13,9 +13,8 @@ def read_wav(file_path, chunk_size=1000):
 
 
 if __name__ == "__main__":
-    all_pin = [5, 6, 13, 19]
-
-    visualizer = visualize.Visualizer()
+    visualizer = visualize.Visualizer(True)
+    all_pin = [17, 22, 23, 27]
     keyboard.key_initiate(all_pin)
 
     try:

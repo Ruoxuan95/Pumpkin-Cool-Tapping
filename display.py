@@ -6,11 +6,12 @@ RED = 255, 0, 0
 GREEN = 0, 255, 0
 BLUE = 0, 0, 255
 YELLOW = 255, 255, 0
+PINK = 255, 192, 203
 BLACK = 0, 0, 0
 
 
 class Screen(object):
-    def __init__(self, width=320, height=240, on_tft=False, ):
+    def __init__(self, width=320, height=240, on_tft=False):
         if on_tft:
             os.putenv('SDL_FBDEV', '/dev/fb1')
             os.putenv('SDL_VIDEODRIVER', 'fbcon')
