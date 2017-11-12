@@ -1,8 +1,9 @@
 import display
 
+
 width, height = 320, 240
 verify_height = 40
-speed = 4
+speed = 2
 trapezoid_top_width = 10
 top_anchor = range(width / 2 - trapezoid_top_width * 2,
                    width / 2 + trapezoid_top_width * 2 + 1,
@@ -20,7 +21,7 @@ class Trapezoid(object):
         self.right_slope = right_slope
         self.color = color
 
-    def get_points(self):
+    def _get_points(self):
         return [[(self.left_slope
                   and (self.top / self.left_slope + top_anchor[self.index], )
                   or (top_anchor[self.index], ))[0], self.top],
@@ -38,7 +39,7 @@ class Trapezoid(object):
                   or (top_anchor[self.index], ))[0], self.bottom]]
 
     def render(self, color=None):
-        self.screen.render_polygon(self.get_points(), color and color or self.color)
+        self.screen.render_polygon(self._get_points(), color and color or self.color)
         return self
 
     def move_down(self):
@@ -76,9 +77,6 @@ class Visualizer(object):
 
     def refresh(self, frame, pressed):
         self.screen.clear()
-        for pos in self.screen.get_click_pos():
-            print pos
-            exit(0)
 
         for i in range(4):
             if frame[i]:
@@ -93,8 +91,11 @@ class Visualizer(object):
 
         self.screen.display()
 
-    def tick(self):
-        self.screen.tick(60)
+        for pos in self.screen.get_click_pos():
+            print pos
+            return False
+
+        return True
 
 
 if __name__ == "__main__":
@@ -107,7 +108,7 @@ if __name__ == "__main__":
                                     ord(byte) >> 2 & 0x1,
                                     ord(byte) >> 1 & 0x1,
                                     ord(byte) >> 0 & 0x1], [1]*4)
-                visualizer.tick()
+                visualizer.screen.tick(60)
 
     except KeyboardInterrupt:
         pass
