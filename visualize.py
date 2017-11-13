@@ -3,7 +3,6 @@ import display
 
 width, height = 320, 240
 verify_height = 40
-speed = 2
 trapezoid_top_width = 10
 top_anchor = range(width / 2 - trapezoid_top_width * 2,
                    width / 2 + trapezoid_top_width * 2 + 1,
@@ -12,7 +11,7 @@ bottom_anchor = range(0, width + 1, width / 4)
 
 
 class Trapezoid(object):
-    def __init__(self, screen, top, bottom, index, left_slope, right_slope, color):
+    def __init__(self, screen, top, bottom, index, left_slope, right_slope, color, speed):
         self.screen = screen
         self.top = top
         self.bottom = bottom
@@ -20,6 +19,7 @@ class Trapezoid(object):
         self.left_slope = left_slope
         self.right_slope = right_slope
         self.color = color
+        self.speed = speed
 
     def _get_points(self):
         return [[(self.left_slope
@@ -43,13 +43,13 @@ class Trapezoid(object):
         return self
 
     def move_down(self):
-        self.top = min(height, self.top + speed)
-        self.bottom = min(height, self.bottom + speed)
+        self.top = min(height, self.top + self.speed)
+        self.bottom = min(height - verify_height, self.bottom + self.speed)
         return self.top < height - verify_height
 
 
 class Note(object):
-    def __init__(self, screen, index, color):
+    def __init__(self, screen, index, color, speed):
         self.color = color
         self.left_slope = (top_anchor[index] != bottom_anchor[index]
                            and (height / float(bottom_anchor[index] - top_anchor[index]), )
@@ -59,35 +59,63 @@ class Note(object):
                             or (0, ))[0]
         self.trapezoids = []
         self.verify = Trapezoid(screen, height - verify_height, height, index,
-                                self.left_slope, self.right_slope, self.color)
+                                self.left_slope, self.right_slope, self.color, speed)
 
     def move_all_trapezoids(self, pressed):
+        self.trapezoids = [trapezoid.render() for trapezoid in self.trapezoids if trapezoid.move_down()]
         self.verify.render(pressed and self.trapezoids and self.trapezoids[0].bottom >= height - verify_height
                            and self.color or display.PINK)
-        self.trapezoids = [trapezoid.render() for trapezoid in self.trapezoids if trapezoid.move_down()]
 
 
 class Visualizer(object):
-    def __init__(self, on_tft=False):
+    def __init__(self, speed, on_tft=False):
         self.screen = display.Screen(width, height, on_tft)
-        self.notes = [Note(self.screen, 0, display.WHITE),
-                      Note(self.screen, 1, display.RED),
-                      Note(self.screen, 2, display.GREEN),
-                      Note(self.screen, 3, display.BLUE)]
+        self.notes = [Note(self.screen, 0, display.WHITE, speed),
+                      Note(self.screen, 1, display.RED, speed),
+                      Note(self.screen, 2, display.GREEN, speed),
+                      Note(self.screen, 3, display.BLUE, speed)]
+        self.state = [0, 0, 0, 0]
+        self.speed = speed
 
-    def refresh(self, frame, pressed):
+    def refresh_map_file(self, frame, pressed):
         self.screen.clear()
 
         for i in range(4):
             if frame[i]:
                 if len(self.notes[i].trapezoids) and self.notes[i].trapezoids[-1].top == height:
-                    self.notes[i].trapezoids[-1].top -= speed
+                    self.notes[i].trapezoids[-1].top -= self.speed
                 else:
-                    self.notes[i].trapezoids.append(Trapezoid(self.screen, -speed, 0, i,
+                    self.notes[i].trapezoids.append(Trapezoid(self.screen, -self.speed, 0, i,
                                                               self.notes[i].left_slope,
                                                               self.notes[i].right_slope,
-                                                              self.notes[i].color))
+                                                              self.notes[i].color, self.speed))
             self.notes[i].move_all_trapezoids(pressed[i])
+
+        self.screen.display()
+
+        for pos in self.screen.get_click_pos():
+            print pos
+            return False
+
+        return True
+
+    def refresh_real_time(self, current_frame, future_frames, pressed):
+        self.screen.clear()
+
+        new_state = [0] * 4
+        for i in range(4):
+            if current_frame[i]:
+                if self.state[i]:
+                    self.notes[i].trapezoids[-1].top -= self.speed
+                    new_state[i] = 1
+                elif future_frames[i]:
+                    self.notes[i].trapezoids.append(Trapezoid(self.screen, -self.speed, 0, i,
+                                                              self.notes[i].left_slope,
+                                                              self.notes[i].right_slope,
+                                                              self.notes[i].color, self.speed))
+                    new_state[i] = 1
+            self.notes[i].move_all_trapezoids(pressed[i])
+        self.state = new_state
 
         self.screen.display()
 
@@ -99,15 +127,15 @@ class Visualizer(object):
 
 
 if __name__ == "__main__":
-    visualizer = Visualizer()
+    visualizer = Visualizer(2)
 
     try:
         with open("music.map", "rb") as fp:
             for byte in fp.read():
-                visualizer.refresh([ord(byte) >> 3 & 0x1,
-                                    ord(byte) >> 2 & 0x1,
-                                    ord(byte) >> 1 & 0x1,
-                                    ord(byte) >> 0 & 0x1], [1]*4)
+                visualizer.refresh_map_file([ord(byte) >> 3 & 0x1,
+                                             ord(byte) >> 2 & 0x1,
+                                             ord(byte) >> 1 & 0x1,
+                                             ord(byte) >> 0 & 0x1], [1]*4)
                 visualizer.screen.tick(60)
 
     except KeyboardInterrupt:
