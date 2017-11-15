@@ -1,4 +1,5 @@
 import display
+import keyboard
 
 
 width, height = 320, 240
@@ -68,7 +69,7 @@ class Note(object):
 
 
 class Visualizer(object):
-    def __init__(self, speed, on_tft=False):
+    def __init__(self, speed=1, on_tft=False):
         self.screen = display.Screen(width, height, on_tft)
         self.notes = [Note(self.screen, 0, display.WHITE, speed),
                       Note(self.screen, 1, display.RED, speed),
@@ -81,7 +82,7 @@ class Visualizer(object):
         self.screen.clear()
 
         for i in range(4):
-            if frame[i]:
+            if frame >> 4-i & 0x01:
                 if len(self.notes[i].trapezoids) and self.notes[i].trapezoids[-1].top == height:
                     self.notes[i].trapezoids[-1].top -= self.speed
                 else:
@@ -127,16 +128,15 @@ class Visualizer(object):
 
 
 if __name__ == "__main__":
-    visualizer = Visualizer(2)
+    visualizer = Visualizer(2, True)
+    all_pin = [17, 22, 23, 27]
 
     try:
-        with open("music.map", "rb") as fp:
-            for byte in fp.read():
-                visualizer.refresh_map_file([ord(byte) >> 3 & 0x1,
-                                             ord(byte) >> 2 & 0x1,
-                                             ord(byte) >> 1 & 0x1,
-                                             ord(byte) >> 0 & 0x1], [1]*4)
-                visualizer.screen.tick(60)
+        keyboard.key_initiate(all_pin)
+        for byte in keyboard.parse_record("record.txt"):
+            if not visualizer.refresh_map_file(int(byte), keyboard.key_status(all_pin)):
+                break
+            visualizer.screen.tick(42)
 
     except KeyboardInterrupt:
         pass

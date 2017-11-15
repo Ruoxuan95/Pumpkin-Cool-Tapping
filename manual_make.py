@@ -3,8 +3,8 @@ import RPi.GPIO as GPIO
 import keyboard
 
 
-dict_pin = {19: "1", 13: "2", 23: "3", 26: "4"}
-all_pin = [19, 13, 23, 26]
+dict_pin = {17: "1", 22: "2", 23: "3", 27: "4"}
+all_pin = [17, 22, 23, 27]
 keyboard.key_initiate(all_pin)
 
 
@@ -15,12 +15,15 @@ running = True
 while running:
     try:
         time.sleep(1.0/30)
-        txt += "0"
+        old_length = len(txt)
         for pin, number in dict_pin.items():
             if not GPIO.input(pin):
                 txt += number
+                break
+        if len(txt) == old_length:
+            txt += "0"
         if len(txt) == 8:
-            with open("record.txt", "wb+") as fp:
+            with open("record.txt", "ab") as fp:
                 fp.write(txt)
             txt = ""
     except KeyboardInterrupt:

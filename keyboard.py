@@ -13,20 +13,8 @@ def key_status(all_pin):
 def key_clean():
     GPIO.cleanup()
 
-def parse_record():
-    with open("record.txt", "rb") as fp:
-        map_record = []
+
+def parse_record(file_path):
+    with open(file_path, "rb") as fp:
         for byte in fp.read():
-
-            if int(byte) == 0:
-                map_record = [0, 0, 0, 0]
-            if int(byte) == 1:
-                map_record = [1, 0, 0, 0]
-            if int(byte) == 2:
-                map_record = [0, 1, 0, 0]
-            if int(byte) == 3:
-                map_record = [0, 0, 1, 0]
-            if int(byte) == 4:
-                map_record = [0, 0, 0, 1]
-
-            yield map_record
+            yield 0x1 << int(byte)

@@ -13,16 +13,18 @@ class Data(object):
         self.chunk_size = chunk_size
 
     def next_chunk(self):
-        old_position = self.position
-        self.position = min(self.position + self.chunk_size, len(self.data))
-        return self.data[old_position: self.position]
+        self.position += self.chunk_size
+        return self.data[self.position - self.chunk_size: self.position]
 
     def has_data(self):
-        return self.position + self.chunk_size < len(self.data)
+        return self.position + self.chunk_size * 2 <= len(self.data)
+
+    def total_chunk(self):
+        return len(self.data) / self.chunk_size
 
 
 class Anylyzer(object):
-    def __init__(self, music_path, frame_rate, pin_list, response_time, speed, on_tft=True):
+    def __init__(self, music_path, frame_rate, pin_list, response_time, speed, on_tft=False):
         sample_rate, music_data = read(music_path)
         if music_data.shape[1] == 2:  # two channels
             music_data = (music_data[:, 0] + music_data[:, 1]) / 2
@@ -60,21 +62,20 @@ class Anylyzer(object):
             threading.Timer(interval, self._analyze,
                             [interval, data_chunks, callback_queue, visualizer]).start()
 
+        callback_queue.put([self._refresh, visualizer, self.future_states[0],
+                            [np.sum((np.array(self.future_states))[:, i]) == self.least_length for i in range(4)]])
+
         del self.future_states[0]
         self.future_states.append(self._fft(data_chunks.next_chunk()))
-        current_frame = self.future_states[0]
-
-        callback_queue.put([self._refresh, visualizer, current_frame,
-                            [np.sum((np.array(self.future_states))[:, i]) == self.least_length for i in range(4)]])
 
         if should_quit:
             callback_queue.put([self._terminate])
 
     def start_analyze(self):
-        self.running = True
+        assert self.data.total_chunk() >= self.least_length
 
-        self.future_states.append([0, 0, 0, 0])  # dummy state
-        [self.future_states.append(self._fft(self.data.next_chunk())) for i in range(self.least_length - 1)]
+        self.running = True
+        [self.future_states.append(self._fft(self.data.next_chunk())) for i in range(self.least_length)]
         self._analyze(1.0 / self.frame_rate, self.data, self.main_thread_queue, self.visualizer)
 
         while self.running:
@@ -94,5 +95,5 @@ class Anylyzer(object):
 
 
 if __name__ == "__main__":
-    analyzer = Anylyzer("peace.wav", 60, [17, 22, 23, 27], 0.2, 2)
+    analyzer = Anylyzer("peace.wav", 60, [17, 22, 23, 27], 0.01, 2)
     analyzer.start_analyze()
