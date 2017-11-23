@@ -100,7 +100,7 @@ class Visualizer(object):
 
         return True
 
-    def refresh_real_time(self, current_frame, future_frames, pressed):
+    def real_time_refresh(self, current_frame, future_frame, pressed):
         self.screen.clear()
 
         new_state = [0] * 4
@@ -109,7 +109,7 @@ class Visualizer(object):
                 if self.state[i]:
                     self.notes[i].trapezoids[-1].top -= self.speed
                     new_state[i] = 1
-                elif future_frames[i]:
+                elif future_frame[i]:
                     self.notes[i].trapezoids.append(Trapezoid(self.screen, -self.speed, 0, i,
                                                               self.notes[i].left_slope,
                                                               self.notes[i].right_slope,
