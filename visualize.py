@@ -78,7 +78,13 @@ class Visualizer(object):
         self.state = [0, 0, 0, 0]
         self.speed = speed
 
-    def refresh_map_file(self, frame, pressed):
+    def load_music(self, music_path):
+        self.screen.load_music(music_path)
+
+    def play_music(self):
+        self.screen.play_music()
+
+    def map_file_refresh(self, frame, pressed):
         self.screen.clear()
 
         for i in range(4):
@@ -100,8 +106,11 @@ class Visualizer(object):
 
         return True
 
-    def real_time_refresh(self, current_frame, future_frame, pressed):
+    def real_time_refresh(self, current_frame, future_frame, pressed, beat):
         self.screen.clear()
+
+        if beat:
+            self.screen.render_text({"BEAT": (160, 120)}, 120, display.WHITE)
 
         new_state = [0] * 4
         for i in range(4):
@@ -122,9 +131,9 @@ class Visualizer(object):
 
         for pos in self.screen.get_click_pos():
             print pos
-            return False
+            return True
 
-        return True
+        return False
 
 
 if __name__ == "__main__":
@@ -134,7 +143,7 @@ if __name__ == "__main__":
     try:
         keyboard.key_initiate(all_pin)
         for byte in keyboard.parse_record("record.txt"):
-            if not visualizer.refresh_map_file(int(byte), keyboard.key_status(all_pin)):
+            if not visualizer.map_file_refresh(int(byte), keyboard.key_status(all_pin)):
                 break
             visualizer.screen.tick(42)
 

@@ -39,6 +39,13 @@ class Screen(object):
             text_surface = text_font.render(text, True, color)
             self.screen.blit(text_surface, text_surface.get_rect(center=pos))
 
+    def load_music(self, music_path):
+        pygame.mixer.init()
+        pygame.mixer.music.load(music_path)
+
+    def play_music(self):
+        pygame.mixer.music.play()
+
     def tick(self, frame_rate):
         self.clock.tick(frame_rate)
 

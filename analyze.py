@@ -1,58 +1,43 @@
 import numpy as np
 from scipy.io.wavfile import read
-from visualize import Visualizer
+import visualize
 import keyboard
-import threading
-import Queue
-from aubio import tempo
-from time import time
+from aubio import tempo, source
+from time import time, sleep
 
 
-class Data(object):
-    def __init__(self, data_chunks, window_size, hop_size):
+class MusicData(object):
+    def __init__(self, music_path, frame_rate):
+        self.sample_rate, self.data = read(music_path)
+        self.window_size = int(self.sample_rate / frame_rate) * 2
+        self.hop_size = self.window_size // 2
+        self.source = source(music_path, self.sample_rate, self.hop_size)
         self.position = 0
-        self.data = data_chunks
-        self.window_size = window_size
-        self.hop_size = hop_size
 
     def next_chunk(self):
         chunk = self.data[self.position: self.position + self.window_size]
         self.position += self.hop_size
-        return chunk
+        return chunk, self.source()[0]
 
     def has_data(self):
-        return self.position + self.hop_size + self.window_size <= len(self.data)
-
-    def total_chunk(self):
-        return (len(self.data) - self.window_size + self.hop_size) / self.hop_size
+        return self.position + self.window_size <= len(self.data)
 
 
-class Anylyzer(object):
-    def __init__(self, music_path, frame_rate, least_energy, pin_list, response_time, speed, on_tft=False):
-        sample_rate, music_data = read(music_path)
-        hop_size, window_size = [int(sample_rate / frame_rate) * i for i in [1, 2]]
-        if music_data.shape[1] == 2:  # two channels
-            music_data = (music_data[:, 0] + music_data[:, 1]) / 2
-
+class Analyzer(object):
+    def __init__(self, wav_path, mp3_path, frame_rate, least_energy, pin_list, response_time, speed, on_tft=False):
         keyboard.key_initiate(pin_list)
         self.pin_list = pin_list
         self.frame_rate = frame_rate
         self.least_energy = least_energy
         self.least_length = int(speed * frame_rate * response_time)
-        self.data = Data(music_data, window_size, hop_size)
-        self.sample_rate = sample_rate
-        self.main_thread_queue = Queue.Queue()
-        self.visualizer = Visualizer(speed, on_tft)
+        self.data = MusicData(wav_path, frame_rate)
+        self.sample_rate = self.data.sample_rate
+        self.visualizer = visualize.Visualizer(speed, on_tft)
+        self.visualizer.load_music(mp3_path)
         self.running = False
         self.future_notes = []
-        self.tempo = tempo("specdiff", window_size, hop_size, sample_rate)
-
-    def _refresh(self, current_frame, future_frame):
-        return self.visualizer.real_time_refresh(current_frame, future_frame,
-                                                 keyboard.key_status(self.pin_list))
-
-    def _terminate(self):
-        self.running = False
+        self.history_beats = []
+        self.tempo = tempo("mkl", self.data.window_size, self.data.hop_size, self.data.sample_rate)
 
     def _fft(self, data):
         freq_domain = np.fft.fft(data) / len(data)
@@ -65,58 +50,56 @@ class Anylyzer(object):
             return None
     
     def _detect_beat(self, data):
-        return self.tempo(data) and self.tempo.get_confidence() > 0.8
+        if self.tempo(data):
+            return self.tempo.get_confidence()
 
     def _analyze(self):
-        # if there is no data left after this time, terminate the loop after FFT
-        should_quit = not self.data.has_data()
-        if not should_quit and self.running:
-            threading.Timer(1.0 / self.frame_rate, self._analyze).start()
+        melody_data, beat_data = self.data.next_chunk()
 
-        self.main_thread_queue.put([self._refresh, self.future_notes[0],
-                                    [np.sum((np.array(self.future_notes))[:, i]) == self.least_length
-                                     for i in range(4)]])
-
-        new_data = self.data.next_chunk()
-
-        max_freq = self._fft(new_data)
+        max_freq = self._fft(melody_data)
         new_frame = [0] * 4
         if max_freq:
             new_frame[max_freq >= 1000 and 3 or int(max_freq / 250)] = 1
         del self.future_notes[0]
         self.future_notes.append(new_frame)
 
-        if self._detect_beat(new_data):
-            print "{} found beat".format(time())
+        if self.history_beats[0]:
+            print "{} found beat. confidence {}".format(time(), self.history_beats[0])
 
-        if should_quit:
-            self.main_thread_queue.put([self._terminate])
+        clicked = self.visualizer.real_time_refresh(self.future_notes[0],
+                                                    [np.sum((np.array(self.future_notes))[:, i]) ==
+                                                     self.least_length for i in range(4)],
+                                                    keyboard.key_status(self.pin_list), self.history_beats[0])
+        del self.history_beats[0]
+        self.history_beats.append(self._detect_beat(beat_data))
+
+        return self.data.has_data() and not clicked
 
     def real_time_analyze(self):
-        assert self.data.total_chunk() >= self.least_length
-
-        self.running = True
+        cross_screen = (visualize.height - visualize.verify_height) / self.visualizer.speed
         self.future_notes = [[0] * 4] * self.least_length
-        self._analyze()
+        self.history_beats = [0] * cross_screen
 
-        while self.running:
+        running = True
+        counter = 0
+        while running:
             try:
-                items = self.main_thread_queue.get()
-                if len(items) == 1:
-                    items[0]()
-                else:
-                    func = items[0]
-                    args = items[1:]
-                    self.running = func(*args)
+                timestamp = time()
+                running = self._analyze()
+
+                counter += 1
+                if counter == cross_screen - 30:
+                    self.visualizer.play_music()
+
+                while time() - timestamp < 1.0 / self.frame_rate:
+                    sleep(0.00001)
 
             except KeyboardInterrupt:
-                self._terminate()
+                running = False
 
         keyboard.key_clean()
 
 
 if __name__ == "__main__":
-    start = time()
-    analyzer = Anylyzer("peace.wav", 60, 100, [17, 22, 23, 27], 0.01, 2)
+    analyzer = Analyzer("JULY.wav", "JULY.mp3", 60, 0, [17, 22, 23, 27], 0.01, 2)
     analyzer.real_time_analyze()
-    print time() - start
