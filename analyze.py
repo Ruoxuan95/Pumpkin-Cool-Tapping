@@ -2,7 +2,7 @@ import numpy as np
 from scipy.io.wavfile import read
 import visualize
 import keyboard
-from aubio import tempo, source
+from aubio import source, tempo, onset
 from time import time, sleep
 
 
@@ -37,7 +37,9 @@ class Analyzer(object):
         self.running = False
         self.future_notes = []
         self.history_beats = []
+        self.history_onset = []
         self.tempo = tempo("mkl", self.data.window_size, self.data.hop_size, self.data.sample_rate)
+        self.onset = onset("default", self.data.window_size, self.data.hop_size, self.data.sample_rate)
 
     def _fft(self, data):
         freq_domain = np.fft.fft(data) / len(data)
@@ -48,15 +50,23 @@ class Analyzer(object):
             return (max_bin + 1) * (self.sample_rate / len(data))
         else:
             return None
-    
+
     def _detect_beat(self, data):
         if self.tempo(data):
             return self.tempo.get_confidence()
+        else:
+            return None
+
+    def _detect_onset(self, data):
+        if self.onset(data):
+            return self.onset.get_last()
+        else:
+            return None
 
     def _analyze(self):
-        melody_data, beat_data = self.data.next_chunk()
+        fft_data, melody_data = self.data.next_chunk()
 
-        max_freq = self._fft(melody_data)
+        max_freq = self._fft(fft_data)
         new_frame = [0] * 4
         if max_freq:
             new_frame[max_freq >= 1000 and 3 or int(max_freq / 250)] = 1
@@ -65,13 +75,18 @@ class Analyzer(object):
 
         if self.history_beats[0]:
             print "{} found beat. confidence {}".format(time(), self.history_beats[0])
+        if self.history_onset[0]:
+            print "{} found onset {}".format(time(), self.history_onset[0])
 
         clicked = self.visualizer.real_time_refresh(self.future_notes[0],
                                                     [np.sum((np.array(self.future_notes))[:, i]) ==
                                                      self.least_length for i in range(4)],
-                                                    keyboard.key_status(self.pin_list), self.history_beats[0])
+                                                    keyboard.key_status(self.pin_list),
+                                                    self.history_beats[0], self.history_onset[0])
         del self.history_beats[0]
-        self.history_beats.append(self._detect_beat(beat_data))
+        self.history_beats.append(self._detect_beat(melody_data))
+        del self.history_onset[0]
+        self.history_onset.append(self._detect_onset(melody_data))
 
         return self.data.has_data() and not clicked
 
@@ -79,12 +94,13 @@ class Analyzer(object):
         cross_screen = (visualize.height - visualize.verify_height) / self.visualizer.speed
         self.future_notes = [[0] * 4] * self.least_length
         self.history_beats = [0] * cross_screen
+        self.history_onset = [0] * cross_screen
 
         running = True
+        timestamp = time()
         counter = 0
         while running:
             try:
-                timestamp = time()
                 running = self._analyze()
 
                 counter += 1
@@ -93,6 +109,7 @@ class Analyzer(object):
 
                 while time() - timestamp < 1.0 / self.frame_rate:
                     sleep(0.00001)
+                timestamp += 1.0 / self.frame_rate
 
             except KeyboardInterrupt:
                 running = False

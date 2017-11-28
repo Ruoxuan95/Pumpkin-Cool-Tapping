@@ -12,9 +12,3 @@ def key_status(all_pin):
 
 def key_clean():
     GPIO.cleanup()
-
-
-def parse_record(file_path):
-    with open(file_path, "rb") as fp:
-        for byte in fp.read():
-            yield 0x1 << int(byte)

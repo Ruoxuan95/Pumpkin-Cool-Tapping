@@ -1,5 +1,7 @@
 import display
 import keyboard
+from time import time, sleep
+import numpy as np
 
 
 width, height = 320, 240
@@ -24,20 +26,20 @@ class Trapezoid(object):
 
     def _get_points(self):
         return [[(self.left_slope
-                  and (self.top / self.left_slope + top_anchor[self.index], )
-                  or (top_anchor[self.index], ))[0], self.top],
+                  and (self.top / self.left_slope + top_anchor[self.index],)
+                  or (top_anchor[self.index],))[0], self.top],
 
                 [(self.right_slope
-                  and (self.top / self.right_slope + top_anchor[self.index+1], )
-                  or (top_anchor[self.index+1], ))[0], self.top],
+                  and (self.top / self.right_slope + top_anchor[self.index + 1],)
+                  or (top_anchor[self.index + 1],))[0], self.top],
 
                 [(self.right_slope
-                  and (self.bottom / self.right_slope + top_anchor[self.index+1], )
-                  or (top_anchor[self.index+1], ))[0], self.bottom],
+                  and (self.bottom / self.right_slope + top_anchor[self.index + 1],)
+                  or (top_anchor[self.index + 1],))[0], self.bottom],
 
                 [(self.left_slope
-                  and (self.bottom / self.left_slope + top_anchor[self.index], )
-                  or (top_anchor[self.index], ))[0], self.bottom]]
+                  and (self.bottom / self.left_slope + top_anchor[self.index],)
+                  or (top_anchor[self.index],))[0], self.bottom]]
 
     def render(self, color=None):
         self.screen.render_polygon(self._get_points(), color and color or self.color)
@@ -53,11 +55,11 @@ class Note(object):
     def __init__(self, screen, index, color, speed):
         self.color = color
         self.left_slope = (top_anchor[index] != bottom_anchor[index]
-                           and (height / float(bottom_anchor[index] - top_anchor[index]), )
-                           or (0, ))[0]
-        self.right_slope = (top_anchor[index+1] != bottom_anchor[index+1]
-                            and (height / float(bottom_anchor[index+1] - top_anchor[index+1]),)
-                            or (0, ))[0]
+                           and (height / float(bottom_anchor[index] - top_anchor[index]),)
+                           or (0,))[0]
+        self.right_slope = (top_anchor[index + 1] != bottom_anchor[index + 1]
+                            and (height / float(bottom_anchor[index + 1] - top_anchor[index + 1]),)
+                            or (0,))[0]
         self.trapezoids = []
         self.verify = Trapezoid(screen, height - verify_height, height, index,
                                 self.left_slope, self.right_slope, self.color, speed)
@@ -69,7 +71,7 @@ class Note(object):
 
 
 class Visualizer(object):
-    def __init__(self, speed=1, on_tft=False):
+    def __init__(self, speed=1, on_tft=True):
         self.screen = display.Screen(width, height, on_tft)
         self.notes = [Note(self.screen, 0, display.WHITE, speed),
                       Note(self.screen, 1, display.RED, speed),
@@ -88,7 +90,7 @@ class Visualizer(object):
         self.screen.clear()
 
         for i in range(4):
-            if frame >> 4-i & 0x01:
+            if frame >> 3 - i & 0x01:
                 if len(self.notes[i].trapezoids) and self.notes[i].trapezoids[-1].top == height:
                     self.notes[i].trapezoids[-1].top -= self.speed
                 else:
@@ -106,11 +108,8 @@ class Visualizer(object):
 
         return True
 
-    def real_time_refresh(self, current_frame, future_frame, pressed, beat):
+    def real_time_refresh(self, current_frame, future_frame, pressed, beat, onset):
         self.screen.clear()
-
-        if beat:
-            self.screen.render_text({"BEAT": (160, 120)}, 120, display.WHITE)
 
         new_state = [0] * 4
         for i in range(4):
@@ -127,6 +126,12 @@ class Visualizer(object):
             self.notes[i].move_all_trapezoids(pressed[i])
         self.state = new_state
 
+        if beat:
+            self.screen.render_text({"BEAT": (160, 60)}, 120, display.WHITE)
+
+        if onset:
+            self.screen.render_text({"ONSET": (160, 180)}, 120, display.WHITE)
+
         self.screen.display()
 
         for pos in self.screen.get_click_pos():
@@ -138,14 +143,19 @@ class Visualizer(object):
 
 if __name__ == "__main__":
     visualizer = Visualizer(2, True)
-    all_pin = [17, 22, 23, 27]
+    all_pin = [5, 6, 13, 26]
 
     try:
         keyboard.key_initiate(all_pin)
-        for byte in keyboard.parse_record("record.txt"):
-            if not visualizer.map_file_refresh(int(byte), keyboard.key_status(all_pin)):
+        record = np.load("record.npy")
+        timestamp = time()
+
+        for idx in range(len(record)):
+            if not visualizer.map_file_refresh(record[idx], keyboard.key_status(all_pin)):
                 break
-            visualizer.screen.tick(42)
+            while time() - timestamp < 1.0 / 60:
+                sleep(0.000001)
+            timestamp += 1.0 / 60
 
     except KeyboardInterrupt:
         pass
