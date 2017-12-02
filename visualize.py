@@ -124,6 +124,7 @@ class Visualizer(object):
                                                               self.notes[i].right_slope,
                                                               self.notes[i].color, self.speed))
             elif self.state[i]:
+                self.notes[i].trapezoids[-1].top -= self.speed
                 new_state[i] = self.state[i] - 1
 
             self.notes[i].move_all_trapezoids(pressed[i])
