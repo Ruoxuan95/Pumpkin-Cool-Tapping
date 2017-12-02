@@ -71,17 +71,16 @@ class Note(object):
 
 
 class Visualizer(object):
-    def __init__(self, speed=1, on_tft=True):
+    def __init__(self, music_path, trapezoid_height, speed=2, on_tft=False):
         self.screen = display.Screen(width, height, on_tft)
+        self.screen.load_music(music_path)
         self.notes = [Note(self.screen, 0, display.WHITE, speed),
                       Note(self.screen, 1, display.RED, speed),
                       Note(self.screen, 2, display.GREEN, speed),
                       Note(self.screen, 3, display.BLUE, speed)]
+        self.trapezoid_height = trapezoid_height
         self.state = [0, 0, 0, 0]
         self.speed = speed
-
-    def load_music(self, music_path):
-        self.screen.load_music(music_path)
 
     def play_music(self):
         self.screen.play_music()
@@ -108,30 +107,28 @@ class Visualizer(object):
 
         return True
 
-    def real_time_refresh(self, current_frame, future_frame, pressed, beat, onset):
+    def detection_refresh(self, frame, pressed):
         self.screen.clear()
 
         new_state = [0] * 4
         for i in range(4):
-            if current_frame[i]:
+            if frame[i]:
+                # set state value to designated height for countdown
+                new_state[i] = self.trapezoid_height
+
                 if self.state[i]:
                     self.notes[i].trapezoids[-1].top -= self.speed
-                    new_state[i] = 1
-                elif future_frame[i]:
+                else:
                     self.notes[i].trapezoids.append(Trapezoid(self.screen, -self.speed, 0, i,
                                                               self.notes[i].left_slope,
                                                               self.notes[i].right_slope,
                                                               self.notes[i].color, self.speed))
-                    new_state[i] = 1
+            elif self.state[i]:
+                new_state[i] = self.state[i] - 1
+
             self.notes[i].move_all_trapezoids(pressed[i])
+
         self.state = new_state
-
-        if beat:
-            self.screen.render_text({"BEAT": (160, 60)}, 120, display.WHITE)
-
-        if onset:
-            self.screen.render_text({"ONSET": (160, 180)}, 120, display.WHITE)
-
         self.screen.display()
 
         for pos in self.screen.get_click_pos():
@@ -144,6 +141,7 @@ class Visualizer(object):
 if __name__ == "__main__":
     visualizer = Visualizer(2, True)
     all_pin = [5, 6, 13, 26]
+    interval = 1.0 / 60
 
     try:
         keyboard.key_initiate(all_pin)
@@ -153,9 +151,11 @@ if __name__ == "__main__":
         for idx in range(len(record)):
             if not visualizer.map_file_refresh(record[idx], keyboard.key_status(all_pin)):
                 break
-            while time() - timestamp < 1.0 / 60:
-                sleep(0.000001)
-            timestamp += 1.0 / 60
+
+            sleep_time = timestamp + interval - time()
+            if sleep_time > 0:
+                sleep(sleep_time)
+            timestamp += interval
 
     except KeyboardInterrupt:
         pass

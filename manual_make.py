@@ -14,6 +14,7 @@ pygame.mixer.music.play()
 
 record = []
 timestamp = time()
+interval = 1.0 / 60
 running = True
 while running:
     try:
@@ -23,9 +24,10 @@ while running:
                 current += number
         record.append(current)
 
-        while time() - timestamp < 1.0 / 60:
-            sleep(0.000001)
-        timestamp += 1.0 / 60
+        sleep_time = timestamp + interval - time()
+        if sleep_time > 0:
+            sleep(sleep_time)
+        timestamp += interval
 
     except KeyboardInterrupt:
         running = False
