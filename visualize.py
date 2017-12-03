@@ -2,15 +2,16 @@ import display
 import keyboard
 from time import time, sleep
 import numpy as np
+import subprocess
 
 
-width, height = 320, 240
 verify_height = 40
 trapezoid_top_width = 10
-top_anchor = range(width / 2 - trapezoid_top_width * 2,
-                   width / 2 + trapezoid_top_width * 2 + 1,
+top_anchor = range(display.width / 2 - trapezoid_top_width * 2,
+                   display.width / 2 + trapezoid_top_width * 2 + 1,
                    trapezoid_top_width)
-bottom_anchor = range(0, width + 1, width / 4)
+bottom_anchor = range(0, display.width + 1, display.width / 4)
+select_pos = [(160, 30), (160, 90), (160, 150), (160, 210)]
 
 
 class Trapezoid(object):
@@ -46,34 +47,37 @@ class Trapezoid(object):
         return self
 
     def move_down(self):
-        self.top = min(height, self.top + self.speed)
-        self.bottom = min(height - verify_height, self.bottom + self.speed)
-        return self.top < height - verify_height
+        self.top = min(display.height, self.top + self.speed)
+        self.bottom = min(display.height - verify_height, self.bottom + self.speed)
+        return self.top < display.height - verify_height
 
 
 class Note(object):
     def __init__(self, screen, index, color, speed):
         self.color = color
         self.left_slope = (top_anchor[index] != bottom_anchor[index]
-                           and (height / float(bottom_anchor[index] - top_anchor[index]),)
+                           and (display.height / float(bottom_anchor[index] - top_anchor[index]),)
                            or (0,))[0]
         self.right_slope = (top_anchor[index + 1] != bottom_anchor[index + 1]
-                            and (height / float(bottom_anchor[index + 1] - top_anchor[index + 1]),)
+                            and (display.height / float(bottom_anchor[index + 1] - top_anchor[index + 1]),)
                             or (0,))[0]
         self.trapezoids = []
-        self.verify = Trapezoid(screen, height - verify_height, height, index,
+        self.verify = Trapezoid(screen, display.height - verify_height, display.height, index,
                                 self.left_slope, self.right_slope, self.color, speed)
 
     def move_all_trapezoids(self, pressed):
         self.trapezoids = [trapezoid.render() for trapezoid in self.trapezoids if trapezoid.move_down()]
-        self.verify.render(pressed and self.trapezoids and self.trapezoids[0].bottom >= height - verify_height
+        self.verify.render(pressed and self.trapezoids and self.trapezoids[0].bottom >= display.height - verify_height
                            and self.color or display.PINK)
 
 
 class Visualizer(object):
-    def __init__(self, music_path, trapezoid_height, speed=2, on_tft=False):
-        self.screen = display.Screen(width, height, on_tft)
-        self.screen.load_music(music_path)
+    def __init__(self, music_path="", fifo="", trapezoid_height=20, speed=2, on_tft=False, screen=None):
+        self.screen = screen and screen or display.Screen(on_tft=on_tft)
+        self.screen.clear()
+        self.screen.render_text({"Loading...": (160, 120)}, 40, display.WHITE)
+        self.screen.display()
+        self.cross_screen = (display.height - verify_height) / speed
         self.notes = [Note(self.screen, 0, display.WHITE, speed),
                       Note(self.screen, 1, display.RED, speed),
                       Note(self.screen, 2, display.GREEN, speed),
@@ -81,16 +85,23 @@ class Visualizer(object):
         self.trapezoid_height = trapezoid_height
         self.state = [0, 0, 0, 0]
         self.speed = speed
+        if music_path and fifo:
+            self.fifo = fifo
+            subprocess.call(["mplayer -input file={} {} &".format(fifo, music_path)], shell=True)
+            subprocess.check_output("echo 'pause' > {}".format(fifo), shell=True)
 
     def play_music(self):
-        self.screen.play_music()
+        subprocess.check_output("echo 'pause' > {}".format(self.fifo), shell=True)
+
+    def stop_music(self):
+        subprocess.check_output("echo 'quit' > {}".format(self.fifo), shell=True)
 
     def map_file_refresh(self, frame, pressed):
         self.screen.clear()
 
         for i in range(4):
             if frame >> 3 - i & 0x01:
-                if len(self.notes[i].trapezoids) and self.notes[i].trapezoids[-1].top == height:
+                if len(self.notes[i].trapezoids) and self.notes[i].trapezoids[-1].top == display.height:
                     self.notes[i].trapezoids[-1].top -= self.speed
                 else:
                     self.notes[i].trapezoids.append(Trapezoid(self.screen, -self.speed, 0, i,
@@ -139,24 +150,42 @@ class Visualizer(object):
         return False
 
 
-if __name__ == "__main__":
-    visualizer = Visualizer(2, True)
-    all_pin = [5, 6, 13, 26]
-    interval = 1.0 / 60
+class MapReader(object):
+    def __init__(self, music_path, map_path, pin_list, frame_rate, speed=2, on_tft=False, screen=None):
+        self.record = np.load(map_path)
+        self.pin_list = pin_list
+        keyboard.key_initiate(pin_list)
+        self.interval = 1.0 / frame_rate
+        self.visualizer = Visualizer(music_path, "mplayer_fifo", 0, speed, on_tft, screen)
 
-    try:
-        keyboard.key_initiate(all_pin)
-        record = np.load("record.npy")
+    def __call__(self):
         timestamp = time()
+        display_start = time()
+        counter = 0
 
-        for idx in range(len(record)):
-            if not visualizer.map_file_refresh(record[idx], keyboard.key_status(all_pin)):
-                break
+        try:
+            for idx in range(len(self.record)):
+                counter += 1
+                if counter == self.visualizer.cross_screen:
+                    self.visualizer.play_music()
 
-            sleep_time = timestamp + interval - time()
-            if sleep_time > 0:
-                sleep(sleep_time)
-            timestamp += interval
+                if not self.visualizer.map_file_refresh(self.record[idx], keyboard.key_status(self.pin_list)):
+                    break
 
-    except KeyboardInterrupt:
-        pass
+                sleep_time = timestamp + self.interval - time()
+                if sleep_time > 0:
+                    sleep(sleep_time)
+                timestamp += self.interval
+
+        except KeyboardInterrupt:
+            pass
+
+        finally:
+            self.visualizer.stop_music()
+            keyboard.key_clean()
+            print("Elapsed time: {:.2f}s".format(time() - display_start))
+
+
+if __name__ == "__main__":
+    map_reader = MapReader("peace.mp3", "peace&love.npy", [26, 13, 6, 5], 60)
+    map_reader()

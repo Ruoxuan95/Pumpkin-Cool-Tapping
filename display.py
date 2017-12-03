@@ -2,6 +2,8 @@ import pygame
 import os
 
 
+width, height = 320, 240
+
 WHITE = 255, 255, 255
 RED = 255, 0, 0
 GREEN = 0, 255, 0
@@ -12,7 +14,7 @@ BLACK = 0, 0, 0
 
 
 class Screen(object):
-    def __init__(self, width=320, height=240, on_tft=False):
+    def __init__(self, on_tft=False):
         if on_tft:
             os.putenv('SDL_FBDEV', '/dev/fb1')
             os.putenv('SDL_VIDEODRIVER', 'fbcon')
@@ -38,15 +40,6 @@ class Screen(object):
         for text, pos in text_pos.items():
             text_surface = text_font.render(text, True, color)
             self.screen.blit(text_surface, text_surface.get_rect(center=pos))
-
-    @staticmethod
-    def load_music(music_path):
-        pygame.mixer.init()
-        pygame.mixer.music.load(music_path)
-
-    @staticmethod
-    def play_music():
-        pygame.mixer.music.play()
 
     def tick(self, frame_rate):
         self.clock.tick(frame_rate)

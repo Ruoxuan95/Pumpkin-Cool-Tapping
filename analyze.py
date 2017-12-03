@@ -28,20 +28,22 @@ def detect_onset(audio, index):
         mag, phase = c2p(fft(window(frame)))
         frames.append(onset_detector(mag, phase))
 
-    result = onsets(array([frames]), [1])
+    onsets_array = onsets(array([frames]), [1])
     print("Subprocess {} finished. Elapsed time: {:.2}s".format(index, time() - processing_start))
-    return result
+    return onsets_array
 
 
 class Analyzer(object):
     def __init__(self, music_path, sample_rate, frame_rate, least_energy, pin_list, response_time,
-                 speed=2, on_tft=False):
+                 speed=2, on_tft=False, screen=None):
         keyboard.key_initiate(pin_list)
         self.pin_list = pin_list
+        self.frame_rate = frame_rate
         self.time_interval = 1.0 / frame_rate
         self.least_energy = least_energy
         self.sample_rate = sample_rate
-        self.visualizer = visualize.Visualizer(music_path, int(speed * frame_rate * response_time), speed, on_tft)
+        self.visualizer = visualize.Visualizer(music_path, "mplayer_fifo",
+                                               int(speed * frame_rate * response_time), speed, on_tft, screen)
 
         stats_file = "{}.npz".format(os.path.splitext(music_path)[0])
         # if the music has not been processed before
@@ -55,7 +57,7 @@ class Analyzer(object):
 
             pool = multiprocessing.Pool()
             num_process = multiprocessing.cpu_count()
-            segment_length = int(len(audio) / num_process)
+            segment_length = int(len(audio) / num_process) / 1024 * 1024
 
             onset_collector = []
             self.num_frames = len(audio)
@@ -78,7 +80,7 @@ class Analyzer(object):
             self.onsets = np.array(onset_collector)
 
             print("Onset detection finished. Elapsed time: {:.2f}s".format(time() - processing_start))
-            np.savez(os.path.splitext(music_path)[0], num_frame=np.array([self.num_frames]), onsets=self.onsets)
+            np.savez(os.path.splitext(music_path)[0], num_frames=np.array([self.num_frames]), onsets=self.onsets)
 
         else:
             stats = np.load(stats_file)
@@ -87,30 +89,22 @@ class Analyzer(object):
             print("Pre-processing skipped")
 
     def __call__(self):
-        cross_screen = (visualize.height - visualize.verify_height) / self.visualizer.speed
-        self.history_onset = [0] * cross_screen
         timestamp = time()
         display_start = time()
-        counter = 0
         read_onset = 0
+        counter = 0
 
         try:
-            for i in xrange(self.num_frames):
+            for i in xrange(int(self.num_frames / float(self.sample_rate) * self.frame_rate)):
                 counter += 1
-                if counter == cross_screen - 30:
+                if counter == self.visualizer.cross_screen:
                     self.visualizer.play_music()
 
                 frame = [0] * 4
-                if self.history_onset[0]:
+                if time() - display_start > self.onsets[read_onset]:
+                    read_onset += 1
                     frame[np.random.randint(0, 4)] = 1
                 clicked = self.visualizer.detection_refresh(frame, keyboard.key_status(self.pin_list))
-
-                del self.history_onset[0]
-                if time() - display_start > self.onsets[read_onset]:
-                    self.history_onset.append(True)
-                    read_onset += 1
-                else:
-                    self.history_onset.append(False)
 
                 if not clicked:
                     sleep_time = timestamp + self.time_interval - time()
@@ -124,10 +118,11 @@ class Analyzer(object):
             pass
 
         finally:
+            self.visualizer.stop_music()
             keyboard.key_clean()
             print("Elapsed time: {:.2f}s".format(time() - display_start))
 
 
 if __name__ == "__main__":
-    analyzer = Analyzer("JULY.mp3", 44100, 60, 0, [17, 22, 23, 27], 0.05)
+    analyzer = Analyzer("locked.mp3", 44100, 60, 0, [26, 13, 6, 5], 0.05)
     analyzer()
