@@ -87,7 +87,7 @@ class Visualizer(object):
         self.speed = speed
         if music_path and fifo:
             self.fifo = fifo
-            subprocess.call(["mplayer -input file={} {} &".format(fifo, music_path)], shell=True)
+            subprocess.call(["mplayer -slave -idle -softvol -softvol-max 2000 -volume 2000 -input file={} {} &".format(fifo, music_path)], shell=True)
             subprocess.check_output("echo 'pause' > {}".format(fifo), shell=True)
 
     def play_music(self):

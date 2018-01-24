@@ -4,7 +4,7 @@ from analyze import Analyzer
 from time import sleep
 
 
-select_text = ["Select a music", "Peace & Love", "Locked Away", "July"]
+select_text = ["Easy - Peace & Love", "Medium - Locked Away", "Difficult - July", "QUIT"]
 select_music = {k: v for (k, v) in zip(select_text, select_pos)}
 screen = display.Screen(on_tft=True)
 all_pin = [5, 6, 13, 26][::-1]
@@ -23,13 +23,13 @@ running = True
 while running:
     pos = screen.get_click_pos()
     if pos:
-        if pos[0][1] < 60:
+        if pos[0][1] > 180:
             running = False
         else:
-            if pos[0][1] < 120:
+            if pos[0][1] < 60:
                 map_reader = MapReader("peace.mp3", "peace&love.npy", all_pin, frame_rate, screen=screen)
                 map_reader()
-            elif pos[0][1] < 180:
+            elif pos[0][1] < 120:
                 analyzer = Analyzer("locked.mp3", 44100, frame_rate, 0, all_pin, response_time, screen=screen)
                 analyzer()
             else:
