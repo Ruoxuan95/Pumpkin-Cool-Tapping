@@ -4,12 +4,12 @@ from analyze import Analyzer
 from time import sleep
 
 
-select_text = ["Easy - Peace & Love", "Medium - Locked Away", "Difficult - July", "QUIT"]
+select_text = ["Easy - Peace & Love", "Medium - Locked Away", "Hard - July", "QUIT"]
 select_music = {k: v for (k, v) in zip(select_text, select_pos)}
 screen = display.Screen(on_tft=True)
 all_pin = [5, 6, 13, 26][::-1]
 frame_rate = 60
-response_time = 0.05
+response_time = 0.1
 
 
 def display_select_music():
@@ -27,14 +27,11 @@ while running:
             running = False
         else:
             if pos[0][1] < 60:
-                map_reader = MapReader("peace.mp3", "peace&love.npy", all_pin, frame_rate, screen=screen)
-                map_reader()
+                MapReader("peace.mp3", "peace&love.npy", all_pin, frame_rate, screen=screen)()
             elif pos[0][1] < 120:
-                analyzer = Analyzer("locked.mp3", 44100, frame_rate, 0, all_pin, response_time, screen=screen)
-                analyzer()
+                Analyzer("locked.mp3", 44100, frame_rate, 0, all_pin, response_time, screen=screen)()
             else:
-                analyzer = Analyzer("july.mp3", 44100, frame_rate, 0, all_pin, response_time, screen=screen)
-                analyzer()
+                Analyzer("july.mp3", 44100, frame_rate, 0, all_pin, response_time, screen=screen)()
             display_select_music()
 
-    sleep(0.01)
+    sleep(0.05)

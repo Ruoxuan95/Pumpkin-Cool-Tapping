@@ -2,7 +2,7 @@ import display
 import keyboard
 from time import time, sleep
 import numpy as np
-import subprocess
+from omxplayer.player import OMXPlayer
 
 
 verify_height = 40
@@ -72,7 +72,7 @@ class Note(object):
 
 
 class Visualizer(object):
-    def __init__(self, music_path="", fifo="", trapezoid_height=20, speed=2, on_tft=False, screen=None):
+    def __init__(self, music_path="", trapezoid_height=20, speed=2, on_tft=False, screen=None):
         self.screen = screen and screen or display.Screen(on_tft=on_tft)
         self.screen.clear()
         self.screen.render_text({"Loading...": (160, 120)}, 40, display.WHITE)
@@ -85,16 +85,15 @@ class Visualizer(object):
         self.trapezoid_height = trapezoid_height
         self.state = [0, 0, 0, 0]
         self.speed = speed
-        if music_path and fifo:
-            self.fifo = fifo
-            subprocess.call(["mplayer -slave -idle -softvol -softvol-max 2000 -volume 2000 -input file={} {} &".format(fifo, music_path)], shell=True)
-            subprocess.check_output("echo 'pause' > {}".format(fifo), shell=True)
+        if music_path:
+            self.player = OMXPlayer(music_path)
+            self.player.pause()
 
     def play_music(self):
-        subprocess.check_output("echo 'pause' > {}".format(self.fifo), shell=True)
+        self.player.play()
 
     def stop_music(self):
-        subprocess.check_output("echo 'quit' > {}".format(self.fifo), shell=True)
+        self.player.quit()
 
     def map_file_refresh(self, frame, pressed):
         self.screen.clear()
@@ -156,7 +155,7 @@ class MapReader(object):
         self.pin_list = pin_list
         keyboard.key_initiate(pin_list)
         self.interval = 1.0 / frame_rate
-        self.visualizer = Visualizer(music_path, "mplayer_fifo", 0, speed, on_tft, screen)
+        self.visualizer = Visualizer(music_path, 0, speed, on_tft, screen)
 
     def __call__(self):
         timestamp = time()

@@ -43,8 +43,7 @@ class Analyzer(object):
         self.least_energy = least_energy
         self.sample_rate = sample_rate
         self.music_path = music_path
-        self.visualizer = visualize.Visualizer(music_path, "mplayer_fifo",
-                                               int(speed * frame_rate * response_time), speed, on_tft, screen)
+        self.visualizer = visualize.Visualizer(music_path, int(speed * frame_rate * response_time), speed, on_tft, screen)
 
         stats_file = "{}.npz".format(os.path.splitext(music_path)[0])
         # if the music has not been processed before
@@ -99,7 +98,6 @@ class Analyzer(object):
             for i in xrange(int(self.num_frames / float(self.sample_rate) * self.frame_rate)):
                 counter += 1
                 if counter == self.visualizer.cross_screen:
-                    #os.system("omxplayer -b {} &".format(self.music_path))
                     self.visualizer.play_music()
 
                 frame = [0] * 4
@@ -121,7 +119,6 @@ class Analyzer(object):
 
         finally:
             self.visualizer.stop_music()
-            #os.system("sudo pkill omxplayer".format(self.music_path))
             keyboard.key_clean()
             print("Elapsed time: {:.2f}s".format(time() - display_start))
 
